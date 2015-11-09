@@ -16,6 +16,7 @@
     You should have received a copy of the Lesser GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
+#define _POSIX_C_SOURCE 1
 
 #include <assert.h>
 #include <string.h>
@@ -25,6 +26,7 @@
 #else
 #include <rubyio.h>
 #endif
+#include <ruby/thread.h>
 #include <zmq.h>
 
 #if defined _MSC_VER
@@ -352,7 +354,7 @@ static VALUE internal_select(VALUE argval)
         poll_args.nitems = ps.nitems;
         poll_args.timeout_usec = arg->timeout_usec;
 
-        rb_thread_blocking_region (zmq_poll_blocking, (void*)&poll_args, NULL, NULL);
+        rb_thread_call_without_gvl2 ((void * (*)(void *))zmq_poll_blocking, (void*)&poll_args, RUBY_UBF_IO, NULL);
         rc = poll_args.rc;
     }
     else
@@ -1625,7 +1627,7 @@ static VALUE socket_send (int argc_, VALUE* argv_, VALUE self_)
         send_args.socket = s->socket;
         send_args.msg = &msg;
         send_args.flags = flags;
-        rb_thread_blocking_region (zmq_send_blocking, (void*) &send_args, NULL, NULL);
+        rb_thread_call_without_gvl2 ((void * (*)(void *))zmq_send_blocking, (void*)&send_args, RUBY_UBF_IO, NULL);
         rc = send_args.rc;
     }
     else
@@ -1709,8 +1711,7 @@ static VALUE socket_recv (int argc_, VALUE* argv_, VALUE self_)
         recv_args.socket = s->socket;
         recv_args.msg = &msg;
         recv_args.flags = flags;
-        rb_thread_blocking_region (zmq_recv_blocking, (void*) &recv_args,
-            NULL, NULL);
+        rb_thread_call_without_gvl2 ((void * (*)(void *))zmq_recv_blocking, (void*)&recv_args, RUBY_UBF_IO, NULL);
         rc = recv_args.rc;
     }
     else
